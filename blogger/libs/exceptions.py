@@ -25,7 +25,11 @@ class NetworkException(APIException):
 
 
 class ResourceNotFoundException(NotFound):
-    pass
+    def __init__(self, detail=None, code=None, errors=None):        
+        if errors:
+            logger.info(errors)
+            print("dvnjdsvnjsdvnsdvnbjksdfnbvjfn")
+        return super(ResourceNotFoundException, self).__init__(detail, code)
 
 
 class ParseException(ParseError):

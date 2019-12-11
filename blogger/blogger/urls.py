@@ -12,8 +12,9 @@ from blog import views as blog_views
 # intialize DefaultRouter.
 router = SimpleRouter()
 
-# register blog app urls with router.  BlogViewSet
+# register blog app urls with router.
 router.register(r'blog', blog_views.BlogViewSet, base_name='blog')
+router.register(r'comment', blog_views.BlogsCommentViewSet, base_name='comment')
 
 urlpatterns = [
     path('admin/', admin.site.urls),

@@ -6,6 +6,7 @@ from django.contrib.auth.models import User
 #app level imports.
 from .models import (
     Blog,
+    Comment,
 )
 
 
@@ -14,8 +15,6 @@ class BlogPostSerializer(serializers.ModelSerializer):
     """
     title = serializers.CharField(required=False, min_length=2)
     content = serializers.CharField(required=False, min_length=2)
-    # likes = TagSerializer(read_only=True, many=True)
-    # dislikes = TagSerializer(read_only=True, many=True)
     author = serializers.PrimaryKeyRelatedField(queryset=User.objects.all())
     status = serializers.ChoiceField(
         choices = (
@@ -35,11 +34,35 @@ class BlogPostSerializer(serializers.ModelSerializer):
 class ListOfBlogsSerializer(serializers.ModelSerializer):
     """
     """
+    total_comments = serializers.SerializerMethodField()
+
     class Meta:
         model = Blog
-        fields = ('id', 'title', 'content', 'total_likes', 'total_dislikes')
+        fields = ('id', 'title', 'content', 'total_likes', 'total_dislikes', 'total_comments', )
 
+    def get_total_comments(self, obj):
+        return Comment.objects.filter(blog=obj).count()
 
     def validate(self, data):
         return data
 
+
+class CommentPostSerializer(serializers.ModelSerializer):
+    """
+    """
+    comment = serializers.CharField(required=False, min_length=2)
+    blog = serializers.PrimaryKeyRelatedField(queryset=Blog.objects.all())
+
+    class Meta:
+        model = Comment
+        fields = ('id', 'comment', 'blog')
+
+    def create(self, validated_data):
+        user = Comment.objects.create(**validated_data)
+        user.save()
+        return user
+
+class ListOfCommentsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Comment
+        fields = ('id', 'blog_id' , 'comment')

@@ -1,5 +1,6 @@
 #django/rest_framework imports.
 from django.shortcuts import render
+from django.db.models import Max
 from django.http import Http404
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -7,11 +8,14 @@ from rest_framework.viewsets import GenericViewSet
 from rest_framework import status
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.permissions import IsAuthenticated
+import json
 
 #app level imports.
 from .serializer import(
     BlogPostSerializer,
     ListOfBlogsSerializer,
+    CommentPostSerializer,
+    ListOfCommentsSerializer,
 )
 from libs.constants import(
     BAD_ACTION,
@@ -19,32 +23,44 @@ from libs.constants import(
 )
 from libs.exceptions import(
     ParseException,
+    ResourceNotFoundException,
 )
 from .models import (
     Blog,
+    Comment,
 )
+from libs.sort_json_data import sort
+
+
 class BlogViewSet(GenericViewSet):
     """
     """
-    queryset = Blog.objects.all()
+    lookup_field = 'id'
+    http_method_names = ['get', 'post', 'put','delete']
+    model = Blog
 
-    def get_queryset(self,filterdata=None):
+    permission_classes=[IsAuthenticated, ]
+
+    def get_queryset(self, filterdata=None):
+        self.queryset = self.model.objects.all()
         if filterdata:
-            self.queryset = Blog.objects.filter(**filterdata)
+            self.queryset = self.queryset.filter(**filterdata)
         return self.queryset
 
     def get_object(self, id):
         try:
-            return Blog.objects.get(id=id)
-        except Exception as e:
+            return self.model.objects.get(id=id)
+        except Exception as key:
             raise Http404('Invalid id')
-
+            # raise ResourceNotFoundException()
 
     serializers_dict = {
         'post': BlogPostSerializer,
         'mybloglist': ListOfBlogsSerializer,
         'listofblogs': ListOfBlogsSerializer,
-        # 'like': ListOfBlogsSerializer,
+        'mostliked': ListOfBlogsSerializer,
+        'mostcommented': ListOfBlogsSerializer,
+        'mostdisliked': ListOfBlogsSerializer,
     }
 
     def get_serializer_class(self):
@@ -55,7 +71,7 @@ class BlogViewSet(GenericViewSet):
         except KeyError as key:
             raise ParseException(BAD_ACTION, errors=key)
 
-    @action(methods=['post'], detail=False, permission_classes=[IsAuthenticated, ])
+    @action(methods=['post'], detail=False)
     def post(self, request):
         '''
         Post a blog.
@@ -69,19 +85,21 @@ class BlogViewSet(GenericViewSet):
         if serializer.is_valid() is False:
             raise ParseException(BAD_REQUEST, serializer.errors)
 
-        user = serializer.create(serializer.validated_data)
+        user = serializer.save()
         print(user)
         if user:
             return Response(serializer.data, status=status.HTTP_201_CREATED)     
         return Response(serializer.data, status=status.HTTP_200_OK)
 
-    @action(methods=['get'], detail=False, permission_classes=[IsAuthenticated, ])
+    @action(methods=['get'], detail=False)
     def mybloglist(self, request):
         '''
         To get the perticular user blogs.
         '''
         try:
-            data = self.get_serializer(self.get_queryset({"author": request.user}), many=True).data
+            data = self.get_serializer(self.get_queryset(
+                filterdata={"author": request.user}), many=True).data
+
             page = self.paginate_queryset(data)
             if page is not None:
                 return self.get_paginated_response(page)
@@ -90,20 +108,20 @@ class BlogViewSet(GenericViewSet):
             return Response({'error':str(e)},
              status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-    @action(methods=['delete'], detail=False, permission_classes=[IsAuthenticated, ])
+    @action(methods=['delete'], detail=False)
     def deleteblog(self, request):
         '''
-        delete the blog.
+        delete blog.
         '''
         try:
-            data = self.get_queryset({"author": request.user,"id": request.data["id"]})
+            data = self.get_queryset(filterdata={"author": request.user,"id": request.data["id"]})
             data.delete()
-            return Response(({"detail":"record deleted successfully."}),
+            return Response(({"detail": "deleted successfully."}),
                 status=status.HTTP_200_OK)
         except Exception as e:
             return Response({"error":str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
-    @action(methods=['get'], detail=False, permission_classes=[IsAuthenticated, ])
+    @action(methods=['get'], detail=False)
     def listofblogs(self, request):
         '''
         List of blogs.
@@ -119,8 +137,7 @@ class BlogViewSet(GenericViewSet):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     @action(
-        methods=['post'], detail=False,
-        permission_classes=[IsAuthenticated, ]
+        methods=['post'], detail=False
      )
     def like(self, request):
         '''
@@ -137,8 +154,7 @@ class BlogViewSet(GenericViewSet):
             return Response(({'error':str(e)}), status=status.HTTP_400_BAD_REQUEST)
 
     @action(
-        methods=['post'], detail=False, 
-        permission_classes=[IsAuthenticated, ]
+        methods=['post'], detail=False
     )
     def dislike(self, request):
         '''
@@ -153,6 +169,120 @@ class BlogViewSet(GenericViewSet):
 
         except Exception as e:
             return Response(({'error':str(e)}), status=status.HTTP_400_BAD_REQUEST)
-        
+
+    @action(methods=['get'], detail=False)
+    def mostcommented(self, request):
+        '''
+        It returns most commentd blog.
+        '''
+        try:
+            data = self.get_serializer(self.get_queryset(), many=True).data
+            most_commented = sort(data, 'total_comments')[-1]
+            return Response(most_commented) 
+
+        except Exception as e:
+            return Response(({'error':str(e)}), status=status.HTTP_400_BAD_REQUEST)
+
+    @action(methods=['get'], detail=False)
+    def mostliked(self, request):
+        '''
+        It returns most liked blog.
+        '''
+        try:  
+            data = self.get_serializer(self.get_queryset(), many=True).data
+            most_liked = sort(data, 'total_likes')[-1]
+            return Response(most_liked)
+
+        except Exception as e:
+            return Response(({'error':str(e)}), status=status.HTTP_400_BAD_REQUEST)
+
+    @action(methods=['get'], detail=False)
+    def mostdisliked(self, request):
+        '''
+        It returns most disliked blog.
+        '''
+        try:
+            data = self.get_serializer(self.get_queryset(), many=True).data
+            most_disliked = sort(data, 'total_dislikes')[-1]
+            return Response(most_disliked)
+
+        except Exception as e:
+            return Response(({'error':str(e)}), status=status.HTTP_400_BAD_REQUEST)
 
 
+class BlogsCommentViewSet(GenericViewSet):
+    """
+    """
+    lookup_field = 'id'
+    http_method_names = ['get', 'post', 'put','delete']
+    model = Comment
+
+    permission_classes = [IsAuthenticated, ]
+
+    def get_queryset(self, filterdata=None):
+        self.queryset = self.model.objects.all()
+        if filterdata:
+            self.queryset = self.queryset.filter(**filterdata)
+        return self.queryset
+
+
+    def get_serializer_class(self):
+        """
+        """
+        try:
+            return self.serializers_dict[self.action]
+        except KeyError as key:
+            raise ParseException(BAD_ACTION, errors=key)
+
+    serializers_dict = {
+        'postcomment': CommentPostSerializer,
+        'listcomment': ListOfCommentsSerializer,
+    }
+
+    @action(methods=['post'], detail=False)
+    def postcomment(self, request):
+        '''
+        '''
+        data = request.data
+        data["blog"] = request.data['id']
+
+        serializer = self.get_serializer(data=data)
+        print(serializer.is_valid())
+        print(serializer.errors)
+        if serializer.is_valid() is False:
+            raise ParseException(BAD_REQUEST, serializer.errors)
+
+        user = serializer.save()
+        print(user)
+        if user:
+            return Response(serializer.data, status=status.HTTP_201_CREATED)     
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    @action(methods=['get'], detail=False)
+    def listcomment(self, request):
+        '''
+        '''
+        try:
+            data = self.get_serializer(self.get_queryset(
+                filterdata={"blog": request.data['id']}), many=True).data
+
+            page = self.paginate_queryset(data)
+            if page is not None:
+                return self.get_paginated_response(page)
+
+        except Exception as e:
+            return Response({'error':str(e)},
+             status=status.HTTP_400_BAD_REQUEST)
+
+    @action(methods=['delete'], detail=False)
+    def deletecomment(self, request):
+        '''
+        delete comment.
+        '''
+        try:
+            data = self.get_queryset(filterdata={"id": request.data["id"]})
+            data.delete()
+            return Response(({"detail": "deleted successfully."}),
+                status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({"error":str(e)}, status=status.HTTP_400_BAD_REQUEST)

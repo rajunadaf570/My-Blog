@@ -58,3 +58,5 @@ class Comment(TimeStampedModel):
         on_delete=models.CASCADE,
         related_name='blog'
     )
+    class Meta:
+        ordering = ['-created_at']
