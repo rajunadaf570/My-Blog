@@ -38,7 +38,7 @@ class ListOfBlogsSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Blog
-        fields = ('id', 'title', 'content', 'total_likes', 'total_dislikes', 'total_comments', )
+        fields = ('id', 'title', 'content', 'total_likes', 'total_dislikes', 'total_comments','views' )
 
     def get_total_comments(self, obj):
         return Comment.objects.filter(blog=obj).count()
@@ -66,3 +66,16 @@ class ListOfCommentsSerializer(serializers.ModelSerializer):
     class Meta:
         model = Comment
         fields = ('id', 'blog_id' , 'comment')
+
+
+
+class ListOfBlogsWithUserSerializer(serializers.ModelSerializer):
+
+    total_comments = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Blog
+        fields = ('id', 'title', 'content', 'total_likes', 'total_dislikes', 'views', 'total_comments', )
+
+    def get_total_comments(self, obj):
+        return Comment.objects.filter(blog=obj).values('comment','blog__author__username')

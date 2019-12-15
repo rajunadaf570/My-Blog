@@ -26,6 +26,7 @@ class Blog(TimeStampedModel):
     likes = models.ManyToManyField(User, related_name='likes', blank=True)
     dislikes = models.ManyToManyField(User, related_name='dislikes', blank=True)
     status = models.CharField(choices=STATUS, max_length=1, default='D')
+    views = models.BigIntegerField(default=0)
     author = models.ForeignKey(
         User,
         on_delete=models.PROTECT,

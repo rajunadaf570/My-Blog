@@ -9,6 +9,7 @@ from rest_framework import status
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.permissions import IsAuthenticated
 import json
+from django.db.models import F
 
 #app level imports.
 from .serializer import(
@@ -16,6 +17,7 @@ from .serializer import(
     ListOfBlogsSerializer,
     CommentPostSerializer,
     ListOfCommentsSerializer,
+    ListOfBlogsWithUserSerializer,
 )
 from libs.constants import(
     BAD_ACTION,
@@ -61,6 +63,9 @@ class BlogViewSet(GenericViewSet):
         'mostliked': ListOfBlogsSerializer,
         'mostcommented': ListOfBlogsSerializer,
         'mostdisliked': ListOfBlogsSerializer,
+        'mostviewd': ListOfBlogsSerializer,
+        'blogdetails': ListOfBlogsWithUserSerializer,
+        'getblog': ListOfBlogsWithUserSerializer,
     }
 
     def get_serializer_class(self):
@@ -178,7 +183,7 @@ class BlogViewSet(GenericViewSet):
         try:
             data = self.get_serializer(self.get_queryset(), many=True).data
             most_commented = sort(data, 'total_comments')[-1]
-            return Response(most_commented) 
+            return Response(most_commented, status=status.HTTP_200_OK) 
 
         except Exception as e:
             return Response(({'error':str(e)}), status=status.HTTP_400_BAD_REQUEST)
@@ -191,7 +196,7 @@ class BlogViewSet(GenericViewSet):
         try:  
             data = self.get_serializer(self.get_queryset(), many=True).data
             most_liked = sort(data, 'total_likes')[-1]
-            return Response(most_liked)
+            return Response(most_liked, status=status.HTTP_200_OK)
 
         except Exception as e:
             return Response(({'error':str(e)}), status=status.HTTP_400_BAD_REQUEST)
@@ -204,10 +209,54 @@ class BlogViewSet(GenericViewSet):
         try:
             data = self.get_serializer(self.get_queryset(), many=True).data
             most_disliked = sort(data, 'total_dislikes')[-1]
-            return Response(most_disliked)
+            return Response(most_disliked, status=status.HTTP_200_OK)
 
         except Exception as e:
             return Response(({'error':str(e)}), status=status.HTTP_400_BAD_REQUEST)
+
+    @action(methods=['get'], detail=False)
+    def mostviewd(self, request):
+        '''
+        It returns most viewd blog.
+        '''
+        try:
+            data = self.get_serializer(self.get_queryset(), many=True).data
+            most_disliked = sort(data, 'views')[-1]
+            return Response(most_disliked, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return Response(({'error':str(e)}), status=status.HTTP_400_BAD_REQUEST)
+
+
+    @action(methods=['get'], detail=False)
+    def getblog(self, request):
+        '''
+        To get the perticular blog.
+        '''
+        try:
+            self.model.objects.filter(id=request.data['id']).update(views=F('views')+1) # <-- increament views.
+            data = self.get_serializer(self.get_queryset(
+            filterdata={"id": request.data['id']}), many=True).data
+            return Response(data, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return Response(({'error':str(e)}), status=status.HTTP_400_BAD_REQUEST)
+
+
+    @action(methods=['get'], detail=False)
+    def blogdetails(self, request):
+        '''
+        get all the blogs with views  commented username, liked, and disliked.
+        '''
+        try:
+            data = self.get_serializer(self.get_queryset(), many=True).data
+            page = self.paginate_queryset(data)
+            if page is not None:
+                return self.get_paginated_response(page)
+
+        except Exception as e:
+            return Response({'error':str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class BlogsCommentViewSet(GenericViewSet):
