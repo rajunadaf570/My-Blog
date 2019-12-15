@@ -17,7 +17,7 @@ from .serializer import(
     ListOfBlogsSerializer,
     CommentPostSerializer,
     ListOfCommentsSerializer,
-    ListOfBlogsWithUserSerializer,
+    ListOfBlogsWithDetailsSerializer,
 )
 from libs.constants import(
     BAD_ACTION,
@@ -64,8 +64,8 @@ class BlogViewSet(GenericViewSet):
         'mostcommented': ListOfBlogsSerializer,
         'mostdisliked': ListOfBlogsSerializer,
         'mostviewd': ListOfBlogsSerializer,
-        'blogdetails': ListOfBlogsWithUserSerializer,
-        'getblog': ListOfBlogsWithUserSerializer,
+        'blogsdetails': ListOfBlogsWithDetailsSerializer,
+        'getblog': ListOfBlogsWithDetailsSerializer,
     }
 
     def get_serializer_class(self):
@@ -79,7 +79,7 @@ class BlogViewSet(GenericViewSet):
     @action(methods=['post'], detail=False)
     def post(self, request):
         '''
-        Post a blog.
+        Post your blog.
         '''
         data = request.data
         data["author"] = request.user.id
@@ -132,7 +132,7 @@ class BlogViewSet(GenericViewSet):
         List of blogs.
         '''
         try:
-            data = self.get_serializer(self.get_queryset(), many=True).data
+            data = self.get_serializer(self.get_queryset(filterdata={'status':'P'}), many=True).data
             page = self.paginate_queryset(data)
             if page is not None:
                 return self.get_paginated_response(page)
@@ -181,7 +181,7 @@ class BlogViewSet(GenericViewSet):
         It returns most commentd blog.
         '''
         try:
-            data = self.get_serializer(self.get_queryset(), many=True).data
+            data = self.get_serializer(self.get_queryset(filterdata={'status':'P'}), many=True).data
             most_commented = sort(data, 'total_comments')[-1]
             return Response(most_commented, status=status.HTTP_200_OK) 
 
@@ -194,7 +194,7 @@ class BlogViewSet(GenericViewSet):
         It returns most liked blog.
         '''
         try:  
-            data = self.get_serializer(self.get_queryset(), many=True).data
+            data = self.get_serializer(self.get_queryset(filterdata={'status':'P'}), many=True).data
             most_liked = sort(data, 'total_likes')[-1]
             return Response(most_liked, status=status.HTTP_200_OK)
 
@@ -207,7 +207,7 @@ class BlogViewSet(GenericViewSet):
         It returns most disliked blog.
         '''
         try:
-            data = self.get_serializer(self.get_queryset(), many=True).data
+            data = self.get_serializer(self.get_queryset(filterdata={'status':'P'}), many=True).data
             most_disliked = sort(data, 'total_dislikes')[-1]
             return Response(most_disliked, status=status.HTTP_200_OK)
 
@@ -220,7 +220,7 @@ class BlogViewSet(GenericViewSet):
         It returns most viewd blog.
         '''
         try:
-            data = self.get_serializer(self.get_queryset(), many=True).data
+            data = self.get_serializer(self.get_queryset(filterdata={'status':'P'}), many=True).data
             most_disliked = sort(data, 'views')[-1]
             return Response(most_disliked, status=status.HTTP_200_OK)
 
@@ -234,9 +234,9 @@ class BlogViewSet(GenericViewSet):
         To get the perticular blog.
         '''
         try:
-            self.model.objects.filter(id=request.data['id']).update(views=F('views')+1) # <-- increament views.
+            self.model.objects.filter(id=request.data['id'], status='P').update(views=F('views')+1) # <-- increament views.
             data = self.get_serializer(self.get_queryset(
-            filterdata={"id": request.data['id']}), many=True).data
+            filterdata={"id": request.data['id'], 'status':'P'}), many=True).data
             return Response(data, status=status.HTTP_200_OK)
 
         except Exception as e:
@@ -244,12 +244,12 @@ class BlogViewSet(GenericViewSet):
 
 
     @action(methods=['get'], detail=False)
-    def blogdetails(self, request):
+    def blogsdetails(self, request):
         '''
-        get all the blogs with views  commented username, liked, and disliked.
+        get all the blogs with total views  who commented , who liked, and who disliked.
         '''
         try:
-            data = self.get_serializer(self.get_queryset(), many=True).data
+            data = self.get_serializer(self.get_queryset(filterdata={'status':'P'}), many=True).data
             page = self.paginate_queryset(data)
             if page is not None:
                 return self.get_paginated_response(page)
@@ -291,6 +291,7 @@ class BlogsCommentViewSet(GenericViewSet):
     @action(methods=['post'], detail=False)
     def postcomment(self, request):
         '''
+        Post your Comment to the Blog.
         '''
         data = request.data
         data["blog"] = request.data['id']
@@ -310,6 +311,7 @@ class BlogsCommentViewSet(GenericViewSet):
     @action(methods=['get'], detail=False)
     def listcomment(self, request):
         '''
+        To get the list of Comments for a perticular blog.
         '''
         try:
             data = self.get_serializer(self.get_queryset(

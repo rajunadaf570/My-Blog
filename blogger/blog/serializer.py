@@ -12,6 +12,7 @@ from .models import (
 
 class BlogPostSerializer(serializers.ModelSerializer):
     """
+    BlogPost Serializer.
     """
     title = serializers.CharField(required=False, min_length=2)
     content = serializers.CharField(required=False, min_length=2)
@@ -33,6 +34,7 @@ class BlogPostSerializer(serializers.ModelSerializer):
 
 class ListOfBlogsSerializer(serializers.ModelSerializer):
     """
+    List of Blog Serializer.
     """
     total_comments = serializers.SerializerMethodField()
 
@@ -49,6 +51,7 @@ class ListOfBlogsSerializer(serializers.ModelSerializer):
 
 class CommentPostSerializer(serializers.ModelSerializer):
     """
+    Post comment serializer.
     """
     comment = serializers.CharField(required=False, min_length=2)
     blog = serializers.PrimaryKeyRelatedField(queryset=Blog.objects.all())
@@ -63,20 +66,33 @@ class CommentPostSerializer(serializers.ModelSerializer):
         return user
 
 class ListOfCommentsSerializer(serializers.ModelSerializer):
+    """
+    List of comment serializer.
+    """
     class Meta:
         model = Comment
         fields = ('id', 'blog_id' , 'comment')
 
 
+class ListOfBlogsWithDetailsSerializer(serializers.ModelSerializer):
+    """
+    List of Blog with details serializer.
+    """
 
-class ListOfBlogsWithUserSerializer(serializers.ModelSerializer):
-
-    total_comments = serializers.SerializerMethodField()
+    comments = serializers.SerializerMethodField()
+    who_likes = serializers.SerializerMethodField()
+    who_dislikes = serializers.SerializerMethodField()
 
     class Meta:
         model = Blog
-        fields = ('id', 'title', 'content', 'total_likes', 'total_dislikes', 'views', 'total_comments', )
-        # ordering_fields = ('-total_comments', '-total_likes', '-views')
+        fields = ('id', 'title', 'content', 'views', 'comments', 'who_likes', 'who_dislikes', )
 
-    def get_total_comments(self, obj):
-        return Comment.objects.filter(blog=obj).values('comment','blog__author__username')
+    def get_comments(self, obj):
+        return Comment.objects.filter(blog=obj).values('comment','blog__author__username', )
+
+    def get_who_likes(self, obj):
+        return Blog.objects.filter(title=obj).values('likes__username')
+
+    def get_who_dislikes(self, obj):
+        return Blog.objects.filter(title=obj).values('dislikes__username')
+

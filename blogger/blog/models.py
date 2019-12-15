@@ -14,7 +14,7 @@ from model_utils import Choices
 
 class Blog(TimeStampedModel):
     """
-    Blog model represents the blog in the database.
+    Blog model represents the number of blogs in the database.
     """
     STATUS = Choices(
         ('D', 'Draft'),
