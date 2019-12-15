@@ -76,6 +76,7 @@ class ListOfBlogsWithUserSerializer(serializers.ModelSerializer):
     class Meta:
         model = Blog
         fields = ('id', 'title', 'content', 'total_likes', 'total_dislikes', 'views', 'total_comments', )
+        # ordering_fields = ('-total_comments', '-total_likes', '-views')
 
     def get_total_comments(self, obj):
         return Comment.objects.filter(blog=obj).values('comment','blog__author__username')
